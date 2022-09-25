@@ -2,7 +2,7 @@ numpy
 opencv-python
 protobuf
 easydict
-pytorch
+torch  # actually, install has torch
 pillow
 matplotlib
 wxpython
