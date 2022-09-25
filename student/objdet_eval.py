@@ -60,9 +60,9 @@ def measure_detection_performance(detections, labels, labels_valid, min_iou=0.5)
                 ## step 3 : extract the four corners of the current detection
                 detection_corners = tools.compute_box_corners(x=detection[1], y=detection[2], w=detection[5], l=detection[6], yaw=detection[7])
                 ## step 4 : computer the center distance between label and detection bounding-box in x, y, and z
-                dist_x=abs(label.box.center_x-x)
-                dist_y=abs(label.box.center_y-y)
-                dist_z=abs(label.box.center_z-z)
+                dist_x=abs(label.box.center_x-detection[1])
+                dist_y=abs(label.box.center_y-detection[2])
+                dist_z=abs(label.box.center_z-detection[3])
                 ## step 5 : compute the intersection over union (IOU) between label and detection bounding-box
                 polygon_det = Polygon(detection_corners)
                 polygon_label = Polygon(label_corners)
