@@ -110,6 +110,7 @@ class Filter:
         ############
         # TODO Step 1: calculate and return covariance of residual S
         ############
+        H = meas.sensor.get_H((track.x))
         S = (H * track.P * H.transpose()) + meas.R # covariance of residual
         return S
         ############
