@@ -28,6 +28,7 @@ from tools.objdet_models.resnet.utils.evaluation_utils import decode, post_proce
 
 from tools.objdet_models.darknet.models.darknet2pytorch import Darknet as darknet
 from tools.objdet_models.darknet.utils.evaluation_utils import post_processing_v2
+from tools.objdet_models.resnet.utils.torch_utils import _sigmoid
 
 
 # load model-related parameters into an edict
@@ -59,9 +60,35 @@ def load_configs_model(model_name='darknet', configs=None):
 
     elif model_name == 'fpn_resnet':
         ####### ID_S3_EX1-3 START #######     
-        #######
+        # Sort by ascending
         print("student task ID_S3_EX1-3")
-
+        configs.arch = 'fpn_resnet'
+        configs.conf_thresh = 0.5
+        configs.down_ratio = 4
+        configs.head_conv = 64
+        configs.hm_size = (152, 152)
+        configs.imagenet_pretrained = False
+        configs.input_size = (608, 608)
+        configs.K = 50
+        configs.max_objects = 50
+        configs.model_path = os.path.join(parent_path, 'tools', 'objdet_models', 'resnet', 'models')
+        configs.num_center_offset = 2
+        configs.num_classes = 3
+        configs.num_dim = 3
+        configs.num_direction = 2
+        configs.num_z = 1
+        configs.pin_memory = True
+        configs.num_input_features = 4
+        configs.pretrained_filename = os.path.join(configs.model_path, 'pretrained', 'fpn_resnet_18_epoch_300.pth')
+        # In order to use just 1 GPU -> reference https://lightrun.com/answers/ycszen-torchseg-if-i-only-have-one-gpu-how-to-set-the-configpy
+        configs.distributed = False # For testing on 1 GPU only
+        configs.heads = {
+            'cen_offset': configs.num_center_offset,
+            'dim': configs.num_dim,
+            'direction': configs.num_direction,
+            'hm_cen': configs.num_classes,
+            'z_coor': configs.num_z,
+        }
         #######
         ####### ID_S3_EX1-3 END #######     
 
@@ -118,7 +145,13 @@ def create_model(configs):
         ####### ID_S3_EX1-4 START #######     
         #######
         print("student task ID_S3_EX1-4")
-
+        arch = "fpn_resnet_18"
+        arch_parts = arch.split('_')
+        num_layers = int(arch_parts[-1])
+        model = fpn_resnet.get_pose_net(num_layers=num_layers,
+                                        heads=configs.heads,
+                                        head_conv=configs.head_conv,
+                                        imagenet_pretrained=configs.imagenet_pretrained)
         #######
         ####### ID_S3_EX1-4 END #######     
     
@@ -167,7 +200,15 @@ def detect_objects(input_bev_maps, model, configs):
             ####### ID_S3_EX1-5 START #######     
             #######
             print("student task ID_S3_EX1-5")
-
+            outputs['hm_cen'] = _sigmoid(outputs['hm_cen'])
+            outputs['cen_offset'] = _sigmoid(outputs['cen_offset'])
+            # decode and post-process
+            detections = decode(hm_cen=outputs['hm_cen'], cen_offset=outputs['cen_offset'],
+                                direction=outputs['direction'], z_coor=outputs['z_coor'],
+                                dim=outputs['dim'], K=configs.K)
+            detections = detections.cpu().numpy().astype(np.float32)
+            detections = post_processing(detections, configs)
+            detections = detections[0][1] # get lists
             #######
             ####### ID_S3_EX1-5 END #######     
 
@@ -178,15 +219,24 @@ def detect_objects(input_bev_maps, model, configs):
     # Extract 3d bounding boxes from model response
     print("student task ID_S3_EX2")
     objects = [] 
-
     ## step 1 : check whether there are any detections
-
+    if len(detections) > 0:
         ## step 2 : loop over all detections
-        
+        for item in detections:
             ## step 3 : perform the conversion using the limits for x, y and z set in the configs structure
-        
+            obj_id, obj_y, obj_x, obj_z, obj_h, obj_w, obj_l, obj_yaw = item
+
+            y_diff = configs.lim_y[1] - configs.lim_y[0]
+            x_diff = configs.lim_x[1] - configs.lim_x[0]
+            # z_diff = configs.lim_z[1] - configs.lim_z[0]
+
+            x = (obj_x / configs.bev_height) * x_diff
+            y = (obj_y / configs.bev_width) * y_diff - y_diff / 2.0
+            w = (obj_w / configs.bev_width) * y_diff
+            l = (obj_l / configs.bev_height) * x_diff
+
             ## step 4 : append the current object to the 'objects' array
-        
+            objects.append([obj_id, x, y, obj_z, obj_h, w, l, -obj_yaw])
     #######
     ####### ID_S3_EX2 START #######   
     
