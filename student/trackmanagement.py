@@ -53,7 +53,9 @@ class Track:
         # Own initilization
 
         self.x = np.zeros((6, 1))
-        self.x[0:3] = (meas.sensor.sens_to_veh * meas.z)[0:3]
+        pos_sens = np.ones((4, 1))
+        pos_sens[0:3] = meas.z[0:3]
+        self.x[0:3] = (meas.sensor.sens_to_veh * pos_sens)[0:3]
 
         # Covariances P
         self.P = np.zeros((6,6))
@@ -161,7 +163,7 @@ class Trackmanagement:
         ############
         value = 1.0 / params.window
         track.score += value
-        
+
         if track.score > params.confirmed_threshold:
             track.state = "confirmed"
         else:
